@@ -283,6 +283,21 @@ async function checkWithOSV(packages) {
 }
 
 /**
+ * Direct mapping from OSV severity strings to our severity levels.
+ * OSV uses: "CRITICAL", "HIGH", "MODERATE", "LOW"
+ * We use:   "Critical", "High", "Medium",   "Low", "Safe"
+ * Note: Both "MODERATE" and "MEDIUM" map to "Medium" — OSV primarily uses
+ * "MODERATE", but "MEDIUM" is kept as a defensive fallback for other sources.
+ */
+const SEVERITY_MAP = {
+  CRITICAL: 'Critical',
+  HIGH: 'High',
+  MODERATE: 'Medium',
+  MEDIUM: 'Medium',
+  LOW: 'Low',
+};
+
+/**
  * Maps OSV severity string to a numeric CVSS score.
  * @param {string} severity
  * @returns {number}
@@ -299,20 +314,10 @@ function severityToCvss(severity) {
 }
 
 /**
- * Maps a CVSS score to a severity label.
- * @param {number} cvss
- * @returns {string}
- */
-function cvssToSeverityLabel(cvss) {
-  if (cvss >= 9.0) return 'Critical';
-  if (cvss >= 7.0) return 'High';
-  if (cvss >= 4.0) return 'Medium';
-  if (cvss > 0) return 'Low';
-  return 'Safe';
-}
-
-/**
  * Transforms OSV API response into structured Dependency objects.
+ * Uses a direct severity map to convert OSV strings ("CRITICAL", "HIGH", "MODERATE", "LOW")
+ * into dashboard severity labels ("Critical", "High", "Medium", "Low", "Safe").
+ *
  * @param {ParsedPackage[]} packages - Original ParsedPackage array
  * @param {object} osvResponse - Response from OSV.dev API
  * @returns {Dependency[]} Sorted by CVSS descending
@@ -336,28 +341,39 @@ function buildResults(packages, osvResponse) {
       };
     }
 
-    // Extract CVEs from aliases
+    // Extract CVEs from aliases across all returned vulnerabilities
     const cves = [];
     for (const vuln of vulns) {
       for (const alias of vuln.aliases || []) {
-        if (alias.startsWith('CVE-')) {
+        if (typeof alias === 'string' && alias.startsWith('CVE-')) {
           cves.push(alias);
         }
       }
     }
 
-    // Get severity from first vuln
-    const rawSeverity = vulns[0]?.database_specific?.severity ?? '';
-    const cvss = severityToCvss(rawSeverity);
-    const severity = cvssToSeverityLabel(cvss);
+    // Map OSV severity string to our severity level using direct map.
+    // Warn and fall back to 'Low' for unknown/missing severity values so that
+    // new OSV severity levels can be identified and handled explicitly.
+    const osvSeverity = (vulns[0]?.database_specific?.severity || '').toUpperCase();
+    const severity = SEVERITY_MAP[osvSeverity] || (() => {
+      if (osvSeverity) {
+        console.warn(`[scanService] Unknown OSV severity "${osvSeverity}" for ${pkg.name} — defaulting to "Low"`);
+      }
+      return 'Low';
+    })();
+    const cvss = severityToCvss(osvSeverity);
 
-    // Get fix version
+    // Extract fix version from affected ranges
     let fixVersion = '';
-    const events = vulns[0]?.affected?.[0]?.ranges?.[0]?.events ?? [];
-    for (const event of events) {
-      if (event.fixed !== undefined) {
-        fixVersion = event.fixed;
-        break;
+    const ranges = vulns[0]?.affected ?? [];
+    findFixVersion: for (const affected of ranges) {
+      for (const range of affected.ranges ?? []) {
+        for (const event of range.events ?? []) {
+          if (event.fixed !== undefined) {
+            fixVersion = event.fixed;
+            break findFixVersion;
+          }
+        }
       }
     }
 
@@ -374,6 +390,41 @@ function buildResults(packages, osvResponse) {
 
   // Sort by CVSS descending (highest risk first)
   return dependencies.sort((a, b) => b.cvss - a.cvss);
+}
+
+/**
+ * Logs severity distribution from a completed scan to the browser console.
+ * Useful for verifying that OSV severities are being counted correctly.
+ * @param {Dependency[]} dependencies - Array of scanned dependencies
+ */
+export function debugSeverityCount(dependencies) {
+  const counts = { Critical: 0, High: 0, Medium: 0, Low: 0, Safe: 0 };
+
+  for (const dep of dependencies) {
+    if (dep.severity in counts) {
+      counts[dep.severity]++;
+    }
+  }
+
+  console.group('🔍 Severity Count Debug');
+  console.log(`Total packages: ${dependencies.length}`);
+  console.log(`Critical: ${counts.Critical}`);
+  console.log(`High: ${counts.High}`);
+  console.log(`Medium: ${counts.Medium}`);
+  console.log(`Low: ${counts.Low}`);
+  console.log(`Safe: ${counts.Safe}`);
+  console.log(
+    `Vulnerable (non-Safe): ${counts.Critical + counts.High + counts.Medium + counts.Low}`
+  );
+
+  if (dependencies.length > 0) {
+    console.log('\n📦 Sample Dependencies (first 5):');
+    dependencies.slice(0, 5).forEach((dep) => {
+      console.log(`  ${dep.name}@${dep.version} → ${dep.severity} (CVSS: ${dep.cvss})`);
+    });
+  }
+
+  console.groupEnd();
 }
 
 /**
@@ -410,14 +461,19 @@ export async function runScan(file, onProgress) {
     onProgress(80, 'Building risk report...');
     const dependencies = buildResults(packages, osvResponse);
 
-    onProgress(100, 'Scan complete');
+    // Log severity distribution to help verify counts are correct
+    debugSeverityCount(dependencies);
 
-    const vulnerableCount = dependencies.filter((d) => d.severity !== 'Safe').length;
+    onProgress(95, 'Finalizing scan results...');
+
     const criticalCount = dependencies.filter((d) => d.severity === 'Critical').length;
     const highCount = dependencies.filter((d) => d.severity === 'High').length;
     const mediumCount = dependencies.filter((d) => d.severity === 'Medium').length;
     const lowCount = dependencies.filter((d) => d.severity === 'Low').length;
     const safeCount = dependencies.filter((d) => d.severity === 'Safe').length;
+    const vulnerableCount = criticalCount + highCount + mediumCount + lowCount;
+
+    onProgress(100, 'Scan complete!');
 
     const totalCvss = dependencies.reduce((sum, d) => sum + d.cvss, 0);
     const avgCvss = dependencies.length > 0
