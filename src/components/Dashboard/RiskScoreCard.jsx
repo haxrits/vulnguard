@@ -1,26 +1,22 @@
 import React from 'react';
-import { clsx } from 'clsx';
-import { getRiskScoreTextClass, getRiskScoreColor } from '../../utils/colorMap';
+import { getRiskLabel, getRiskColor, getRiskExplanation } from '../../utils/riskScoring';
 import { Info } from 'lucide-react';
 
 /**
- * RiskScoreCard - Displays overall risk score with visual traffic light
- * 
- * Risk Score Scale:
- * - 0-24: Low (Green) - minimal exposure
- * - 25-49: Medium (Amber) - moderate risk
- * - 50-74: High (Orange) - significant risk
- * - 75-100: Critical (Red) - immediate action required
+ * RiskScoreCard - Displays overall risk score with visual gauge.
+ *
+ * Score ranges:
+ *   75–100 → Critical Risk  (red)
+ *   50–74  → High Risk      (orange)
+ *   25–49  → Medium Risk    (yellow)
+ *   1–24   → Low Risk       (green)
+ *   0      → No Risk        (gray)
  */
-const RiskScoreCard = ({ score, totalVulns }) => {
-  const getLabel = (s) => {
-    if (s >= 75) return { text: 'Critical Risk', color: 'text-red-600 dark:text-red-400', ring: 'border-red-500' };
-    if (s >= 50) return { text: 'High Risk', color: 'text-orange-600 dark:text-orange-400', ring: 'border-orange-500' };
-    if (s >= 25) return { text: 'Medium Risk', color: 'text-amber-600 dark:text-amber-400', ring: 'border-amber-500' };
-    return { text: 'Low Risk', color: 'text-green-600 dark:text-green-400', ring: 'border-green-500' };
-  };
+const RiskScoreCard = ({ score, criticalCount = 0, highCount = 0, totalPackages = 0 }) => {
+  const label = getRiskLabel(score);
+  const hexColor = getRiskColor(score);
+  const explanation = getRiskExplanation(score, criticalCount, highCount, totalPackages);
 
-  const label = getLabel(score);
   const circumference = 2 * Math.PI * 45;
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
@@ -31,7 +27,7 @@ const RiskScoreCard = ({ score, totalVulns }) => {
         <div className="group relative">
           <Info className="w-4 h-4 text-slate-400 cursor-help" />
           <div className="absolute hidden group-hover:block bottom-6 left-0 w-56 p-2 bg-slate-800 text-white text-xs rounded-lg z-10">
-            Calculated using: CVSS Score × Exploitability Factor × Urgency. Scores range 0-100.
+            Weighted severity score: Critical×40, High×25, Medium×15, Low×5 divided by maximum possible danger. Scores range 0-100.
           </div>
         </div>
       </div>
@@ -51,7 +47,7 @@ const RiskScoreCard = ({ score, totalVulns }) => {
           <circle
             cx="50" cy="50" r="45"
             fill="none"
-            stroke={getRiskScoreColor(score)}
+            stroke={hexColor}
             strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -61,18 +57,18 @@ const RiskScoreCard = ({ score, totalVulns }) => {
         </svg>
         {/* Score Text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={clsx('text-3xl font-bold', getRiskScoreTextClass(score))}>
+          <span className="text-3xl font-bold" style={{ color: hexColor }}>
             {score}
           </span>
           <span className="text-xs text-slate-500 dark:text-slate-400">/100</span>
         </div>
       </div>
 
-      <span className={clsx('text-lg font-semibold', label.color)}>
-        {label.text}
+      <span className="text-lg font-semibold" style={{ color: hexColor }}>
+        {label}
       </span>
       <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-1">
-        Based on {totalVulns !== null && totalVulns !== undefined ? `${totalVulns} active` : '30 active'} vulnerabilities
+        {explanation}
       </p>
     </div>
   );
