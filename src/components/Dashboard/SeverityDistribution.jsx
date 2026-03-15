@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardMetrics } from '../../services/mockData';
 
 const COLORS = {
@@ -10,15 +10,16 @@ const COLORS = {
 };
 
 /**
- * SeverityDistribution - Pie chart showing breakdown of vulnerabilities by severity
- * Helps quickly understand the severity landscape of your dependency vulnerabilities
+ * SeverityDistribution - Pie chart showing breakdown of vulnerabilities by severity.
+ * Accepts optional `metrics` prop; falls back to mock data.
+ * @param {{ metrics?: object }} props
  */
-const SeverityDistribution = () => {
+const SeverityDistribution = ({ metrics = dashboardMetrics }) => {
   const data = [
-    { name: 'Critical', value: dashboardMetrics.criticalCount, color: COLORS.Critical },
-    { name: 'High', value: dashboardMetrics.highCount, color: COLORS.High },
-    { name: 'Medium', value: dashboardMetrics.mediumCount, color: COLORS.Medium },
-    { name: 'Low', value: dashboardMetrics.lowCount, color: COLORS.Low },
+    { name: 'Critical', value: metrics.criticalCount, color: COLORS.Critical },
+    { name: 'High', value: metrics.highCount, color: COLORS.High },
+    { name: 'Medium', value: metrics.mediumCount, color: COLORS.Medium },
+    { name: 'Low', value: metrics.lowCount, color: COLORS.Low },
   ];
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
