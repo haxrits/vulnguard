@@ -72,7 +72,7 @@ const RiskScoreCard = ({ score, totalVulns }) => {
         {label.text}
       </span>
       <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-1">
-        Based on {totalVulns != null ? `${totalVulns} active` : '30 active'} vulnerabilities
+        Based on {totalVulns !== null && totalVulns !== undefined ? `${totalVulns} active` : '30 active'} vulnerabilities
       </p>
     </div>
   );

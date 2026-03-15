@@ -5,7 +5,7 @@
 
 const OSV_BATCH_URL = 'https://api.osv.dev/v1/querybatch';
 
-const SUPPORTED_FILENAMES = ['package.json', 'requirements.txt', 'pom.xml', 'go.mod', 'cargo.toml'];
+const SUPPORTED_FILENAMES = ['package.json', 'requirements.txt', 'pom.xml', 'go.mod', 'Cargo.toml'];
 
 /** @typedef {{ name: string, version: string, ecosystem: string }} ParsedPackage */
 
@@ -386,7 +386,7 @@ function buildResults(packages, osvResponse) {
 export async function runScan(file, onProgress) {
   // Validate file type
   const lower = file.name.toLowerCase();
-  if (!SUPPORTED_FILENAMES.includes(lower)) {
+  if (!SUPPORTED_FILENAMES.some((n) => n.toLowerCase() === lower)) {
     throw new Error(
       'Please upload a supported dependency file (package.json, requirements.txt, pom.xml, go.mod, or Cargo.toml)'
     );
