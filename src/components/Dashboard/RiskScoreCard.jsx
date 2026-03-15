@@ -12,7 +12,7 @@ import { Info } from 'lucide-react';
  * - 50-74: High (Orange) - significant risk
  * - 75-100: Critical (Red) - immediate action required
  */
-const RiskScoreCard = ({ score }) => {
+const RiskScoreCard = ({ score, totalVulns }) => {
   const getLabel = (s) => {
     if (s >= 75) return { text: 'Critical Risk', color: 'text-red-600 dark:text-red-400', ring: 'border-red-500' };
     if (s >= 50) return { text: 'High Risk', color: 'text-orange-600 dark:text-orange-400', ring: 'border-orange-500' };
@@ -72,7 +72,7 @@ const RiskScoreCard = ({ score }) => {
         {label.text}
       </span>
       <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-1">
-        Based on 30 active vulnerabilities
+        Based on {totalVulns != null ? `${totalVulns} active` : '30 active'} vulnerabilities
       </p>
     </div>
   );
