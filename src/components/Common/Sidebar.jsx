@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import useScanStore from '../../store/scanStore';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard', badge: null },
@@ -27,6 +28,9 @@ const navItems = [
 const Sidebar = () => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { scanResult } = useScanStore();
+
+  const criticalCount = scanResult?.criticalCount ?? 0;
 
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -86,15 +90,17 @@ const Sidebar = () => {
         </div>
       </nav>
 
-      {/* Critical Alert Banner */}
-      {!collapsed && (
+      {/* Critical Alert Banner — only shown after a scan with critical vulns */}
+      {!collapsed && scanResult && criticalCount > 0 && (
         <div className="mx-3 mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-xs font-semibold text-red-700 dark:text-red-400">Critical Alert</p>
               <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">
-                8 critical vulnerabilities require immediate attention
+                {criticalCount} critical{' '}
+                {criticalCount === 1 ? 'vulnerability requires' : 'vulnerabilities require'}{' '}
+                immediate attention
               </p>
             </div>
           </div>

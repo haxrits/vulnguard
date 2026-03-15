@@ -10,6 +10,8 @@ import LastScanInfo from './LastScanInfo';
 import ScanModal from '../scanner/ScanModal';
 import ScanResultsTable from './ScanResultsTable';
 import { dashboardMetrics } from '../../services/mockData';
+import { calculateRiskScore } from '../../utils/riskScoring';
+import useScanStore from '../../store/scanStore';
 
 /**
  * DashboardOverview - Main dashboard page component
@@ -19,29 +21,23 @@ import { dashboardMetrics } from '../../services/mockData';
  */
 const DashboardOverview = () => {
   const [showModal, setShowModal] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
-  const [lastScanTime, setLastScanTime] = useState(null);
+  const { scanResult, lastScanTime, setScanResult } = useScanStore();
 
   const handleScanComplete = (result) => {
     setScanResult(result);
-    setLastScanTime(new Date());
     setShowModal(false);
   };
 
   // Compute risk score from real data when available
   const riskScore = scanResult
-    ? Math.min(
-        100,
-        Math.round(
-          ((scanResult.criticalCount * 10 +
-            scanResult.highCount * 7 +
-            scanResult.mediumCount * 4 +
-            scanResult.lowCount * 1) /
-            Math.max(scanResult.totalPackages, 1)) *
-            10
-        )
+    ? calculateRiskScore(
+        scanResult.totalPackages,
+        scanResult.criticalCount,
+        scanResult.highCount,
+        scanResult.mediumCount,
+        scanResult.lowCount
       )
-    : dashboardMetrics.overallRiskScore;
+    : 0;
 
   // Metrics object — use real scan data when available, fall back to mock
   const metrics = scanResult
@@ -118,7 +114,12 @@ const DashboardOverview = () => {
         <>
           {/* Top Row: Risk Score + Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <RiskScoreCard score={riskScore} totalVulns={scanResult.vulnerableCount} />
+            <RiskScoreCard
+              score={riskScore}
+              criticalCount={scanResult.criticalCount}
+              highCount={scanResult.highCount}
+              totalPackages={scanResult.totalPackages}
+            />
             <div className="md:col-span-2">
               <KeyMetrics metrics={metrics} />
             </div>
